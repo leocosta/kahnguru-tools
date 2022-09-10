@@ -19,7 +19,7 @@ const { moveFile, fileExists } = require('./helpers');
         devtools: false,
     });
     
-    var page = await pageFactory(browser, options);
+    const page = await pageFactory(browser, options);
 
     // getting baseline dates
     const dates = await page.evaluate(options => {
