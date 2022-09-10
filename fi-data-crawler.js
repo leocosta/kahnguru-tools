@@ -4,7 +4,7 @@ const { moveFile, fileExists } = require('./helpers');
 
 (async () => {
     const options = {
-        targetUrl: 'https://www3.bcb.gov.br/ifdata/',
+        targetUrl: 'https://www3.bcb.gov.br/ifdata',
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3419.0 Safari/537.36',
         dataPath: './data',
         destinationCsv: 'fi-report-{0}.csv',
@@ -12,26 +12,14 @@ const { moveFile, fileExists } = require('./helpers');
         enablePageLog: false
     }
 
-    console.log(`Extracting data from ${options.targetUrl}`);
+    console.log(`[START] Connecting to target host ${options.targetUrl}...`);
 
     const browser = await puppeteer.launch({
         headless: true, 
         devtools: false,
     });
     
-    var page = await browser.newPage();
-    page.on('console', msg => options.enablePageLog && console.log(`PAGE LOG: ${ msg.text() }`));
-
-    const client = await page.target().createCDPSession()
-    await client.send('Page.setDownloadBehavior', {
-        behavior: 'allow',
-        downloadPath: options.dataPath,
-    })  
-
-    await page.setUserAgent(options.userAgent);
-    await page.goto(options.targetUrl, {
-        waitUntil: ['domcontentloaded', 'networkidle0']
-    });
+    var page = await pageFactory(browser, options);
 
     // getting baseline dates
     const dates = await page.evaluate(options => {
@@ -43,20 +31,40 @@ const { moveFile, fileExists } = require('./helpers');
         }))
     }, options);
 
-    dates.forEach(async baseline => {
+    for await (const baseline of dates) {
         if (fileExists(baseline.filename)) {
-            console.log(`Skiping quarter ${ baseline.value }: ${baseline.filename} already exists.`)
+            console.log(`[SKIP] Skiping quarter report of ${ baseline.value }: ${baseline.filename} already exists.`)
         }
         else {
+            console.log(`[PROCESS] Extracting report quarter of ${ baseline.value }...`)
             await extractData(page, baseline, options);
+            console.log(`[DONE] Quarter report extraction of ${ baseline.value } was completed.`)
         }
-    })
+    }
     
     await browser.close();
 
-    console.log(`Extraction has been completed!`)
+    console.log(`[COMPLETE] Extraction has been completed!`)
+
 })();
 
+async function pageFactory(browser, options) {
+    var page = await browser.newPage();
+    page.on('console', msg => options.enablePageLog && console.log(`PAGE LOG: ${msg.text()}`));
+
+    const client = await page.target().createCDPSession();
+    await client.send('Page.setDownloadBehavior', {
+        behavior: 'allow',
+        downloadPath: options.dataPath,
+    });
+
+    await page.setUserAgent(options.userAgent);
+    await page.goto(options.targetUrl, {
+        waitUntil: ['domcontentloaded', 'networkidle0']
+    });
+    
+    return page;
+}
 
 async function extractData(page, baseline, options) {
 
@@ -71,17 +79,13 @@ async function extractData(page, baseline, options) {
     }, baseline);
 
     // waiting for the export button display
-    await page.waitForSelector('#aExportCsv', { visible: true, timeout: 120 * 1000 });
+    await page.waitForSelector('#aExportCsv', { visible: true, timeout: 5 * 60 * 1000 });
 
     // downloading csv
-    await page.evaluate((baseline) => {
-        console.log(`Downloading file ${baseline.filename}`);
-
+    await page.evaluate(() => {
         downloadCsv();
-    }, baseline);
+    });
 
     // renaming file dados.csv to baseline date filename
-    console.log(`Saving report of ${ baseline.value } quarter in ${ baseline.filename }.`);
-
     moveFile(`${ options.dataPath }/${ options.sourceCsv }`, baseline.filename);
 }

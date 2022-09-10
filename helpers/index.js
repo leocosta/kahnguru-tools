@@ -3,8 +3,8 @@ const path = require('path')
 
 const fileExists = (filename) => fs.existsSync(path.join(process.cwd(), filename));
 
-const renameFile = (source, destination) => {
-    fs.rename(path.join(process.cwd(), source), path.join(process.cwd(), destination), error => {
+const renameFile = async (source, destination) => {
+    await fs.renameSync(path.join(process.cwd(), source), path.join(process.cwd(), destination), error => {
         if (error) {
             console.log('ERROR: ' + error);
         }
