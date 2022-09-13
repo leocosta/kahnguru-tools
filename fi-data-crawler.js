@@ -49,7 +49,7 @@ const { moveFile, fileExists } = require('./helpers');
 })();
 
 async function pageFactory(browser, options) {
-    var page = await browser.newPage();
+    const page = await browser.newPage();
     page.on('console', msg => options.enablePageLog && console.log(`PAGE LOG: ${msg.text()}`));
 
     const client = await page.target().createCDPSession();
